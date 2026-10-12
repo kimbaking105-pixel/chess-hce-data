@@ -1,0 +1,64 @@
+name: datagen
+
+on:
+  workflow_dispatch:
+    inputs:
+      pairs_per_proc:
+        description: "пар партий на один процесс"
+        default: "60"
+        required: false
+      base:
+        description: "базовое время, сек"
+        default: "5"
+        required: false
+      inc:
+        description: "добавка, сек"
+        default: "0.1"
+        required: false
+
+jobs:
+  games:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Установка зависимостей
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y g++ python3-chess
+
+      - name: Сборка build 1.2
+        run: |
+          g++ -std=c++17 -O2 -pthread engines/build_1.2.cpp -o engines/build12
+          chmod +x engines/build12
+
+      - name: Самоигра (4 процесса на 4 ядра)
+        env:
+          PAIRS: ${{ inputs.pairs_per_proc || '60' }}
+          BASE: ${{ inputs.base || '5' }}
+          INC: ${{ inputs.inc || '0.1' }}
+        run: |
+          mkdir -p out
+          for k in 0 1 2 3; do
+            seed=$(( ${{ matrix.shard }} * 100 + k + 1 ))
+            python3 scripts/selfplay.py \
+              --a engines/build12 --b engines/build12 \
+              --pairs "$PAIRS" --seed "$seed" --base "$BASE" --inc "$INC" \
+              --out "out/games_bb_${seed}.jsonl" --tag "bb" &
+          done
+          wait
+
+      - name: Извлечение тихих позиций
+        run: |
+          python3 scripts/extract.py --in out/games_*.jsonl --out out/positions_shard${{ matrix.shard }}.jsonl --cap 30
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: datagen-shard-${{ matrix.shard }}
+          path: out/
+          retention-days: 7

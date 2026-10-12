@@ -1,0 +1,64 @@
+name: bench-generation
+
+# Проверочный тест скорости генерации на раннере GitHub.
+# Запуск вручную дважды: base=5, inc=0.1 и base=2, inc=0.02.
+
+on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "базовое время, сек"
+        default: "5"
+        required: true
+      inc:
+        description: "добавка, сек"
+        default: "0.1"
+        required: true
+      pairs:
+        description: "пар на процесс (2 партии на пару)"
+        default: "5"
+        required: true
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Установка зависимостей
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y g++ python3-chess
+          nproc
+          lscpu | head -20
+
+      - name: Сборка build 1.2
+        run: |
+          g++ -std=c++17 -O2 -pthread engines/build_1.2.cpp -o engines/build12
+          chmod +x engines/build12
+
+      - name: Бенчмарк (4 процесса)
+        run: |
+          mkdir -p bench
+          start=$(date +%s)
+          for k in 0 1 2 3; do
+            python3 scripts/selfplay.py \
+              --a engines/build12 --b engines/build12 \
+              --pairs "${{ inputs.pairs }}" --seed $((k+1)) \
+              --base "${{ inputs.base }}" --inc "${{ inputs.inc }}" \
+              --out "bench/games_${k}.jsonl" --tag "bench" &
+          done
+          wait
+          end=$(date +%s)
+          echo "wall_seconds=$((end-start))" > bench/summary.txt
+
+      - name: Итог
+        run: |
+          python3 scripts/bench_summary.py bench | tee bench/report.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-${{ inputs.base }}-${{ inputs.inc }}
+          path: bench/
+          retention-days: 3
