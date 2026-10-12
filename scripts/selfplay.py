@@ -106,7 +106,9 @@ def main():
     try:
         with open(args.out, "a") as f:
             for p in range(args.pairs):
-                start = random_opening(rng)
+                # 8 или 9 полуходов наугад: иначе после чётного числа полуходов всегда ходят белые,
+                # и преимущество хода уходит в перекос по цветам
+                start = random_opening(rng, plies=rng.choice([8, 9]))
                 for a_white in (True, False):
                     gid = f"{args.tag}_s{args.seed}_p{p}_{'A' if a_white else 'B'}"
                     g = play_game(eA, eB, start, a_white, args.base, args.inc)
