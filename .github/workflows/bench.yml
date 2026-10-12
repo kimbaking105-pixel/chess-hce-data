@@ -29,7 +29,10 @@ jobs:
       - name: Установка зависимостей
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y g++ python3-chess
+          sudo apt-get install -y g++
+          python3 -m venv $HOME/venv
+          $HOME/venv/bin/pip install chess
+          echo "$HOME/venv/bin" >> $GITHUB_PATH
           nproc
           lscpu | head -20
 
