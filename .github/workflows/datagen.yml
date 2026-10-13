@@ -48,7 +48,7 @@ jobs:
         run: |
           mkdir -p out
           for k in 0 1 2 3; do
-            seed=$(( ${{ matrix.shard }} * 100 + k + 1 ))
+            seed=$(( ${{ github.run_number }} * 10000 + ${{ matrix.shard }} * 100 + k + 1 ))
             python3 scripts/selfplay.py \
               --a engines/build12 --b engines/build12 \
               --pairs "$PAIRS" --seed "$seed" --base "$BASE" --inc "$INC" \
